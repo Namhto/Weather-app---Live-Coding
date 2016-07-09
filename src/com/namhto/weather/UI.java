@@ -1,0 +1,314 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.namhto.weather;
+
+import java.awt.Point;
+import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLConnection;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.imageio.ImageIO;
+import javax.swing.ImageIcon;
+import org.json.simple.parser.ParseException;
+
+/**
+ *
+ * @author othman
+ */
+public class UI extends javax.swing.JFrame {
+
+    private Point firstClick;
+    private Weather w;
+    /**
+     * Creates new form UI
+     */
+    public UI() throws FileNotFoundException, IOException, ParseException, java.text.ParseException {
+        initComponents();
+        populate();
+    }
+    
+    public void populate() throws FileNotFoundException, IOException, ParseException, java.text.ParseException {
+        
+        String json = connection();
+        this.w = new Weather(json);
+        this.w.parse();
+        
+        this.city.setText(this.w.getCity()+", "+this.w.getCountry());
+        this.temp.setText(String.valueOf(this.w.ls.get(0).getTemp())+"° c");
+        this.date.setText(this.w.ls.get(0).getDate().toString());
+        this.sky.setText(this.w.ls.get(0).getSky());
+        
+        String s = this.w.ls.get(0).getSky();
+        
+        BufferedImage bigImg = ImageIO.read(getClass().getResource("/com/namhto/images/map.png"));
+
+        final int width = 96;
+        final int height = 90;
+        final int rows = 7;
+        final int cols = 5;
+        BufferedImage[] sprites = new BufferedImage[rows * cols];
+
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                sprites[(i * cols) + j] = bigImg.getSubimage(j * width,i * height,width,height);
+            }
+        }
+        
+        this.refresh.setIcon(new ImageIcon(sprites[18]));
+        
+        int hour = Calendar.HOUR_OF_DAY;
+        
+        switch(s){
+            case "Rain":
+                this.weather.setIcon(new ImageIcon(sprites[26]));
+                break;
+            case "Clear":
+                if(hour >= 6 && hour < 18)
+                    this.weather.setIcon(new ImageIcon(sprites[5]));
+                else
+                    this.weather.setIcon(new ImageIcon(sprites[10]));
+                break;
+            case "Clouds":
+                if(hour >= 6 && hour < 18)
+                    this.weather.setIcon(new ImageIcon(sprites[9]));
+                else
+                    this.weather.setIcon(new ImageIcon(sprites[14]));
+                break;
+            default:
+                break;
+        }
+    }
+
+    public String connection() throws IOException, java.text.ParseException {
+        
+        BufferedReader br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
+        Date parsedDate = dateFormat.parse(br.readLine());
+        Timestamp lastCall = new Timestamp(parsedDate.getTime());
+        Long dt = new Timestamp(new Date().getTime()).getTime() - lastCall.getTime();
+        
+        if(dt < 600000) {
+            BufferedReader br2 = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
+            return br2.readLine();
+        }
+        else {
+            String source ="";
+            URL oracle = new URL("http://api.openweathermap.org/data/2.5/forecast/city?id=6455259&APPID=06ffd4bac466fcc023a7d2a824aa2891");
+            URLConnection yc = oracle.openConnection();
+            BufferedReader in = new BufferedReader(new InputStreamReader(yc.getInputStream()));
+            String inputLine;
+            
+            while ((inputLine = in.readLine()) != null)
+                source +=inputLine;
+            in.close();
+            
+            BufferedWriter out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
+            out.write(new Timestamp(new Date().getTime()).toString());
+            out.close();
+            
+            BufferedWriter out2 = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
+            out2.write(source);
+            out2.close();
+            
+            return source;
+        }
+    }
+    
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
+
+        jLabel1 = new javax.swing.JLabel();
+        refresh = new javax.swing.JLabel();
+        weather = new javax.swing.JLabel();
+        sky = new javax.swing.JLabel();
+        date = new javax.swing.JLabel();
+        temp = new javax.swing.JLabel();
+        first = new javax.swing.JLabel();
+        city = new javax.swing.JLabel();
+        exit = new javax.swing.JLabel();
+        menu = new javax.swing.JLabel();
+        background = new javax.swing.JLabel();
+
+        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setUndecorated(true);
+        setResizable(false);
+        getContentPane().setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+
+        jLabel1.setFont(new java.awt.Font("Calibri", 0, 14)); // NOI18N
+        jLabel1.setForeground(new java.awt.Color(255, 255, 255));
+        jLabel1.setText("Live Coding Weather app - Namhto");
+        getContentPane().add(jLabel1, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 0, 210, 30));
+
+        refresh.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        refresh.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                refreshMouseReleased(evt);
+            }
+        });
+        getContentPane().add(refresh, new org.netbeans.lib.awtextra.AbsoluteConstraints(210, 50, 60, 50));
+
+        weather.setFont(new java.awt.Font("Calibri", 0, 36)); // NOI18N
+        weather.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(weather, new org.netbeans.lib.awtextra.AbsoluteConstraints(190, 100, 90, 110));
+
+        sky.setFont(new java.awt.Font("Calibri", 0, 20)); // NOI18N
+        sky.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(sky, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 170, 120, 30));
+
+        date.setFont(new java.awt.Font("Calibri", 0, 18)); // NOI18N
+        date.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(date, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 210, 170, 30));
+
+        temp.setFont(new java.awt.Font("Calibri", 0, 48)); // NOI18N
+        temp.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(temp, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 120, 130, 60));
+
+        first.setBackground(new java.awt.Color(46, 204, 113));
+        first.setOpaque(true);
+        getContentPane().add(first, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 100, 280, 150));
+
+        city.setFont(new java.awt.Font("Calibri", 0, 36)); // NOI18N
+        city.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(city, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 40, 200, 50));
+
+        exit.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        exit.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            public void mouseMoved(java.awt.event.MouseEvent evt) {
+                exitMouseMoved(evt);
+            }
+        });
+        exit.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                exitMouseReleased(evt);
+            }
+        });
+        getContentPane().add(exit, new org.netbeans.lib.awtextra.AbsoluteConstraints(251, 0, 30, 30));
+
+        menu.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            public void mouseDragged(java.awt.event.MouseEvent evt) {
+                menuMouseDragged(evt);
+            }
+        });
+        menu.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                menuMousePressed(evt);
+            }
+        });
+        getContentPane().add(menu, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 280, 30));
+
+        background.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/namhto/images/UI.jpg"))); // NOI18N
+        getContentPane().add(background, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, -1, -1));
+
+        pack();
+    }// </editor-fold>//GEN-END:initComponents
+
+    private void exitMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_exitMouseReleased
+        System.exit(0);
+    }//GEN-LAST:event_exitMouseReleased
+
+    private void exitMouseMoved(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_exitMouseMoved
+
+    }//GEN-LAST:event_exitMouseMoved
+
+    private void menuMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_menuMouseDragged
+        int dx = evt.getX() - this.firstClick.x;
+        int dy = evt.getY() - this.firstClick.y;
+        this.setLocation(this.getLocation().x + dx, this.getLocation().y + dy);
+    }//GEN-LAST:event_menuMouseDragged
+
+    private void menuMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_menuMousePressed
+        this.firstClick = evt.getPoint();
+    }//GEN-LAST:event_menuMousePressed
+
+    private void refreshMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_refreshMouseReleased
+        try {
+            populate();
+        } catch (IOException ex) {
+            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ParseException ex) {
+            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (java.text.ParseException ex) {
+            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_refreshMouseReleased
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String args[]) {
+        /* Set the Nimbus look and feel */
+        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
+        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
+         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
+         */
+        try {
+            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+                if ("Nimbus".equals(info.getName())) {
+                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+                    break;
+                }
+            }
+        } catch (ClassNotFoundException ex) {
+            java.util.logging.Logger.getLogger(UI.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        } catch (InstantiationException ex) {
+            java.util.logging.Logger.getLogger(UI.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        } catch (IllegalAccessException ex) {
+            java.util.logging.Logger.getLogger(UI.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+            java.util.logging.Logger.getLogger(UI.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        }
+        //</editor-fold>
+
+        /* Create and display the form */
+        java.awt.EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    new UI().setVisible(true);
+                } catch (IOException ex) {
+                    Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ParseException ex) {
+                    Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (java.text.ParseException ex) {
+                    Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        });
+    }
+
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JLabel background;
+    private javax.swing.JLabel city;
+    private javax.swing.JLabel date;
+    private javax.swing.JLabel exit;
+    private javax.swing.JLabel first;
+    private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel menu;
+    private javax.swing.JLabel refresh;
+    private javax.swing.JLabel sky;
+    private javax.swing.JLabel temp;
+    private javax.swing.JLabel weather;
+    // End of variables declaration//GEN-END:variables
+}
