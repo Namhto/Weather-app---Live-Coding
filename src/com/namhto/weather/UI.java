@@ -5,6 +5,7 @@
  */
 package com.namhto.weather;
 
+import java.awt.Color;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -14,9 +15,11 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import static java.lang.Thread.sleep;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Timestamp;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -24,6 +27,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /**
@@ -34,6 +39,11 @@ public class UI extends javax.swing.JFrame {
 
     private Point firstClick;
     private Weather w;
+    private String geoLocation = "";
+    private double lat = 0.0;
+    private double lon = 0.0;
+    
+    private boolean ignoreEvents = false;
     /**
      * Creates new form UI
      */
@@ -50,7 +60,9 @@ public class UI extends javax.swing.JFrame {
         
         this.city.setText(this.w.getCity()+", "+this.w.getCountry());
         this.temp.setText(String.valueOf(this.w.ls.get(0).getTemp())+"° c");
-        this.date.setText(this.w.ls.get(0).getDate().toString());
+        
+        SimpleDateFormat format = new SimpleDateFormat("yyyy.MM.dd HH:mm");
+        this.date.setText(format.format(this.w.ls.get(0).getDate()));
         this.sky.setText(this.w.ls.get(0).getSky());
         
         String s = this.w.ls.get(0).getSky();
@@ -91,44 +103,107 @@ public class UI extends javax.swing.JFrame {
                 else
                     this.weather.setIcon(new ImageIcon(sprites[14]));
                 break;
+            case "Snow":
+                this.weather.setIcon(new ImageIcon(sprites[32]));
+                break;       
             default:
                 break;
         }
     }
-
-    public String connection() throws IOException, java.text.ParseException {
+    
+    public void getCoords() throws ParseException {
         
+        JSONParser parser = new JSONParser();
+        JSONObject jsonobject = (JSONObject) parser.parse(this.geoLocation);
+        this.lat = (Double) jsonobject.get("lat");
+        this.lon = (Double) jsonobject.get("lon");
+    }
+
+    public String connection() throws IOException, java.text.ParseException, ParseException {
+        
+        /******************************************IP geolocation**********************************************/
+        String geolocationResponse ="";
+        URL geolocationURL = new URL("http://ip-api.com/json");
+        URLConnection geolocationConnection = geolocationURL.openConnection();
+        BufferedReader in = new BufferedReader(new InputStreamReader(geolocationConnection.getInputStream()));
+        String inputLine;
+
+        while ((inputLine = in.readLine()) != null)
+            geolocationResponse += inputLine;
+        in.close();
+        
+        this.geoLocation = geolocationResponse;
+        
+        getCoords();
+        
+        /******************************************Saving the last call time to the API**********************************************/
         BufferedReader br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
-        Date parsedDate = dateFormat.parse(br.readLine());
-        Timestamp lastCall = new Timestamp(parsedDate.getTime());
-        Long dt = new Timestamp(new Date().getTime()).getTime() - lastCall.getTime();
         
-        if(dt < 600000) {
+        Long dt = 0l;
+        String s = br.readLine();
+        if(s != null) {
+            Date parsedDate = dateFormat.parse(s);
+            Timestamp lastCall = new Timestamp(parsedDate.getTime());
+            dt = new Timestamp(new Date().getTime()).getTime() - lastCall.getTime();
+            
+            if(dt < 600000) { //If last call time less than 10 minutes, use the saved previous response, no call
             BufferedReader br2 = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
             return br2.readLine();
+            }
+
+            else {
+                String weatherResponse ="";
+                String requestURL = "http://api.openweathermap.org/data/2.5/weather?lat=" + this.lat + "&lon=" + this.lon + "&APPID=06ffd4bac466fcc023a7d2a824aa2891";
+                URL oracle = new URL(requestURL);
+                URLConnection yc = oracle.openConnection();
+                BufferedReader in2 = new BufferedReader(new InputStreamReader(yc.getInputStream()));
+                String inputLine2;
+
+                while ((inputLine2 = in2.readLine()) != null)
+                    weatherResponse +=inputLine2;
+                in2.close();
+
+                /******************************************Saving the counter since the last call to the weather API**********************************************/
+                BufferedWriter out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
+                out.write(new Timestamp(new Date().getTime()).toString());
+                out.close();
+
+                /******************************************Saving the last response of the weather API**********************************************/
+                BufferedWriter out2 = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
+                out2.write(weatherResponse);
+                out2.close();
+
+                return weatherResponse;
+            }
         }
         else {
-            String source ="";
-            URL oracle = new URL("http://api.openweathermap.org/data/2.5/forecast/city?id=6455259&APPID=06ffd4bac466fcc023a7d2a824aa2891");
-            URLConnection yc = oracle.openConnection();
-            BufferedReader in = new BufferedReader(new InputStreamReader(yc.getInputStream()));
-            String inputLine;
             
-            while ((inputLine = in.readLine()) != null)
-                source +=inputLine;
-            in.close();
-            
-            BufferedWriter out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
-            out.write(new Timestamp(new Date().getTime()).toString());
-            out.close();
-            
-            BufferedWriter out2 = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
-            out2.write(source);
-            out2.close();
-            
-            return source;
+            String weatherResponse ="";
+                String requestURL = "http://api.openweathermap.org/data/2.5/weather?lat=" + this.lat + "&lon=" + this.lon + "&APPID=06ffd4bac466fcc023a7d2a824aa2891";
+                URL oracle = new URL(requestURL);
+                URLConnection yc = oracle.openConnection();
+                BufferedReader in2 = new BufferedReader(new InputStreamReader(yc.getInputStream()));
+                String inputLine2;
+
+                while ((inputLine2 = in2.readLine()) != null)
+                    weatherResponse +=inputLine2;
+                in2.close();
+
+                /******************************************Saving the counter since the last call to the weather API**********************************************/
+                BufferedWriter out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
+                out.write(new Timestamp(new Date().getTime()).toString());
+                out.close();
+
+                /******************************************Saving the last response of the weather API**********************************************/
+                BufferedWriter out2 = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
+                out2.write(weatherResponse);
+                out2.close();
+
+                return weatherResponse;
         }
+        /******************************************Weather API call**********************************************/
+        
     }
     
     /**
@@ -140,15 +215,16 @@ public class UI extends javax.swing.JFrame {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        jLabel1 = new javax.swing.JLabel();
+        exit = new javax.swing.JLabel();
         refresh = new javax.swing.JLabel();
+        refreshFeedBack = new javax.swing.JLabel();
+        jLabel1 = new javax.swing.JLabel();
         weather = new javax.swing.JLabel();
         sky = new javax.swing.JLabel();
         date = new javax.swing.JLabel();
         temp = new javax.swing.JLabel();
         first = new javax.swing.JLabel();
         city = new javax.swing.JLabel();
-        exit = new javax.swing.JLabel();
         menu = new javax.swing.JLabel();
         background = new javax.swing.JLabel();
 
@@ -156,43 +232,6 @@ public class UI extends javax.swing.JFrame {
         setUndecorated(true);
         setResizable(false);
         getContentPane().setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
-
-        jLabel1.setFont(new java.awt.Font("Calibri", 0, 14)); // NOI18N
-        jLabel1.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel1.setText("Live Coding Weather app - Namhto");
-        getContentPane().add(jLabel1, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 0, 210, 30));
-
-        refresh.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        refresh.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseReleased(java.awt.event.MouseEvent evt) {
-                refreshMouseReleased(evt);
-            }
-        });
-        getContentPane().add(refresh, new org.netbeans.lib.awtextra.AbsoluteConstraints(210, 50, 60, 50));
-
-        weather.setFont(new java.awt.Font("Calibri", 0, 36)); // NOI18N
-        weather.setForeground(new java.awt.Color(255, 255, 255));
-        getContentPane().add(weather, new org.netbeans.lib.awtextra.AbsoluteConstraints(190, 100, 90, 110));
-
-        sky.setFont(new java.awt.Font("Calibri", 0, 20)); // NOI18N
-        sky.setForeground(new java.awt.Color(255, 255, 255));
-        getContentPane().add(sky, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 170, 120, 30));
-
-        date.setFont(new java.awt.Font("Calibri", 0, 18)); // NOI18N
-        date.setForeground(new java.awt.Color(255, 255, 255));
-        getContentPane().add(date, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 210, 170, 30));
-
-        temp.setFont(new java.awt.Font("Calibri", 0, 48)); // NOI18N
-        temp.setForeground(new java.awt.Color(255, 255, 255));
-        getContentPane().add(temp, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 120, 130, 60));
-
-        first.setBackground(new java.awt.Color(46, 204, 113));
-        first.setOpaque(true);
-        getContentPane().add(first, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 100, 280, 150));
-
-        city.setFont(new java.awt.Font("Calibri", 0, 36)); // NOI18N
-        city.setForeground(new java.awt.Color(255, 255, 255));
-        getContentPane().add(city, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 40, 200, 50));
 
         exit.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         exit.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
@@ -206,6 +245,51 @@ public class UI extends javax.swing.JFrame {
             }
         });
         getContentPane().add(exit, new org.netbeans.lib.awtextra.AbsoluteConstraints(251, 0, 30, 30));
+
+        refresh.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        refresh.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                refreshMouseReleased(evt);
+            }
+        });
+        getContentPane().add(refresh, new org.netbeans.lib.awtextra.AbsoluteConstraints(210, 50, 60, 50));
+
+        refreshFeedBack.setFont(new java.awt.Font("Calibri", 0, 36)); // NOI18N
+        refreshFeedBack.setForeground(new java.awt.Color(255, 255, 255));
+        refreshFeedBack.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        refreshFeedBack.setMaximumSize(new java.awt.Dimension(283, 255));
+        refreshFeedBack.setMinimumSize(new java.awt.Dimension(283, 255));
+        refreshFeedBack.setPreferredSize(new java.awt.Dimension(283, 255));
+        getContentPane().add(refreshFeedBack, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 30, 283, 223));
+
+        jLabel1.setFont(new java.awt.Font("Calibri", 0, 14)); // NOI18N
+        jLabel1.setForeground(new java.awt.Color(255, 255, 255));
+        jLabel1.setText("Live Coding Weather app - Namhto");
+        getContentPane().add(jLabel1, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 0, 210, 30));
+
+        weather.setFont(new java.awt.Font("Calibri", 0, 36)); // NOI18N
+        weather.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(weather, new org.netbeans.lib.awtextra.AbsoluteConstraints(160, 100, 120, 110));
+
+        sky.setFont(new java.awt.Font("Calibri", 0, 20)); // NOI18N
+        sky.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(sky, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 170, 120, 30));
+
+        date.setFont(new java.awt.Font("Calibri", 0, 18)); // NOI18N
+        date.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(date, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 210, 260, 30));
+
+        temp.setFont(new java.awt.Font("Calibri", 0, 48)); // NOI18N
+        temp.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(temp, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 120, 130, 60));
+
+        first.setBackground(new java.awt.Color(46, 204, 113));
+        first.setOpaque(true);
+        getContentPane().add(first, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 100, 283, 154));
+
+        city.setFont(new java.awt.Font("Calibri", 0, 24)); // NOI18N
+        city.setForeground(new java.awt.Color(255, 255, 255));
+        getContentPane().add(city, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 40, 200, 50));
 
         menu.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
             public void mouseDragged(java.awt.event.MouseEvent evt) {
@@ -244,8 +328,30 @@ public class UI extends javax.swing.JFrame {
     }//GEN-LAST:event_menuMousePressed
 
     private void refreshMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_refreshMouseReleased
+        
         try {
-            populate();
+            if(this.refresh.isEnabled()){
+                
+                this.refresh.setEnabled(false);
+                
+                this.refreshFeedBack.setOpaque(true);
+                this.refreshFeedBack.setBackground(new Color(100, 100, 100, 200));
+                this.refreshFeedBack.setText("Refresh...");
+                this.update(this.getGraphics());
+                
+                long start = System.currentTimeMillis();
+                long end = start + 2000;
+                while (System.currentTimeMillis() < end)
+                {
+                }
+
+                populate();
+                this.refreshFeedBack.setOpaque(false);
+                this.refreshFeedBack.setText("");
+                
+                this.refresh.setEnabled(true);
+            }           
+           
         } catch (IOException ex) {
             Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
         } catch (ParseException ex) {
@@ -307,6 +413,7 @@ public class UI extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel menu;
     private javax.swing.JLabel refresh;
+    private javax.swing.JLabel refreshFeedBack;
     private javax.swing.JLabel sky;
     private javax.swing.JLabel temp;
     private javax.swing.JLabel weather;
