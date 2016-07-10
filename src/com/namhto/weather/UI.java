@@ -7,6 +7,7 @@ package com.namhto.weather;
 
 import java.awt.Color;
 import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -49,6 +50,14 @@ public class UI extends javax.swing.JFrame {
      */
     public UI() throws FileNotFoundException, IOException, ParseException, java.text.ParseException {
         initComponents();
+        
+        BufferedReader br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/lastPos.txt").getPath()));
+        Object[] str = br.lines().toArray();
+        
+        if(str.length == 2)
+            this.setLocation(Integer.parseInt((String)str[0]), Integer.parseInt((String)str[1]));
+        else
+            this.setLocation((int)Toolkit.getDefaultToolkit().getScreenSize().getWidth()/2 - this.getSize().width/2, (int)Toolkit.getDefaultToolkit().getScreenSize().getHeight()/2 - this.getSize().height/2);
         populate();
     }
     
@@ -260,7 +269,7 @@ public class UI extends javax.swing.JFrame {
         refreshFeedBack.setMaximumSize(new java.awt.Dimension(283, 255));
         refreshFeedBack.setMinimumSize(new java.awt.Dimension(283, 255));
         refreshFeedBack.setPreferredSize(new java.awt.Dimension(283, 255));
-        getContentPane().add(refreshFeedBack, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 30, 283, 223));
+        getContentPane().add(refreshFeedBack, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 30, 283, 224));
 
         jLabel1.setFont(new java.awt.Font("Calibri", 0, 14)); // NOI18N
         jLabel1.setForeground(new java.awt.Color(255, 255, 255));
@@ -310,7 +319,17 @@ public class UI extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void exitMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_exitMouseReleased
-        System.exit(0);
+        BufferedWriter out = null;
+        try {
+            int lastX = this.getLocationOnScreen().x;
+            int lastY = this.getLocationOnScreen().y;
+            out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/lastPos.txt").getPath()));
+            out.write(lastX + "\n" + lastY);
+            out.close();
+            System.exit(0);
+        } catch (IOException ex) {
+            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }//GEN-LAST:event_exitMouseReleased
 
     private void exitMouseMoved(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_exitMouseMoved
