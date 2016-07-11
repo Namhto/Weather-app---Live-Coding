@@ -11,16 +11,16 @@ import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import static java.lang.Thread.sleep;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Timestamp;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -43,178 +43,230 @@ public class UI extends javax.swing.JFrame {
     private String geoLocation = "";
     private double lat = 0.0;
     private double lon = 0.0;
-    
-    private boolean ignoreEvents = false;
+
     /**
      * Creates new form UI
      */
-    public UI() throws FileNotFoundException, IOException, ParseException, java.text.ParseException {
-        initComponents();
-        
-        BufferedReader br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/lastPos.txt").getPath()));
-        Object[] str = br.lines().toArray();
-        
-        if(str.length == 2)
-            this.setLocation(Integer.parseInt((String)str[0]), Integer.parseInt((String)str[1]));
-        else
-            this.setLocation((int)Toolkit.getDefaultToolkit().getScreenSize().getWidth()/2 - this.getSize().width/2, (int)Toolkit.getDefaultToolkit().getScreenSize().getHeight()/2 - this.getSize().height/2);
-        populate();
-    }
-    
-    public void populate() throws FileNotFoundException, IOException, ParseException, java.text.ParseException {
-        
-        String json = connection();
-        this.w = new Weather(json);
-        this.w.parse();
-        
-        this.city.setText(this.w.getCity()+", "+this.w.getCountry());
-        this.temp.setText(String.valueOf(this.w.ls.get(0).getTemp())+"° c");
-        
-        SimpleDateFormat format = new SimpleDateFormat("yyyy.MM.dd HH:mm");
-        this.date.setText(format.format(this.w.ls.get(0).getDate()));
-        this.sky.setText(this.w.ls.get(0).getSky());
-        
-        String s = this.w.ls.get(0).getSky();
-        
-        BufferedImage bigImg = ImageIO.read(getClass().getResource("/com/namhto/images/map.png"));
-
-        final int width = 96;
-        final int height = 90;
-        final int rows = 7;
-        final int cols = 5;
-        BufferedImage[] sprites = new BufferedImage[rows * cols];
-
-        for (int i = 0; i < rows; i++)
-        {
-            for (int j = 0; j < cols; j++)
-            {
-                sprites[(i * cols) + j] = bigImg.getSubimage(j * width,i * height,width,height);
+    public UI() {
+        BufferedReader br = null;
+        try {
+            initComponents();
+            br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/lastPos.txt").getPath()));
+            Object[] str = br.lines().toArray();
+            if (str.length == 2) {
+                this.setLocation(Integer.parseInt((String) str[0]), Integer.parseInt((String) str[1]));
+            } else {
+                this.setLocation((int) Toolkit.getDefaultToolkit().getScreenSize().getWidth() / 2 - this.getSize().width / 2, (int) Toolkit.getDefaultToolkit().getScreenSize().getHeight() / 2 - this.getSize().height / 2);
+            }   populate();
+        }
+        catch (FileNotFoundException ex) {
+            try {
+                File lastPos = new File(getClass().getResource("/com/namhto/weather/lastPos.txt").getPath());
+                lastPos.createNewFile();
+            }
+            catch (IOException ex1) {
+                this.setLocation(50,50);
             }
         }
-        
-        this.refresh.setIcon(new ImageIcon(sprites[18]));
-        
-        int hour = Calendar.HOUR_OF_DAY;
-        
-        switch(s){
-            case "Rain":
-                this.weather.setIcon(new ImageIcon(sprites[26]));
-                break;
-            case "Clear":
-                if(hour >= 6 && hour < 18)
-                    this.weather.setIcon(new ImageIcon(sprites[5]));
-                else
-                    this.weather.setIcon(new ImageIcon(sprites[10]));
-                break;
-            case "Clouds":
-                if(hour >= 6 && hour < 18)
-                    this.weather.setIcon(new ImageIcon(sprites[9]));
-                else
-                    this.weather.setIcon(new ImageIcon(sprites[14]));
-                break;
-            case "Snow":
-                this.weather.setIcon(new ImageIcon(sprites[32]));
-                break;       
-            default:
-                break;
+        finally {
+            try {
+                br.close();
+            }
+            catch (IOException ex) {}
         }
     }
-    
-    public void getCoords() throws ParseException {
-        
-        JSONParser parser = new JSONParser();
-        JSONObject jsonobject = (JSONObject) parser.parse(this.geoLocation);
-        this.lat = (Double) jsonobject.get("lat");
-        this.lon = (Double) jsonobject.get("lon");
-    }
 
-    public String connection() throws IOException, java.text.ParseException, ParseException {
-        
-        /******************************************IP geolocation**********************************************/
-        String geolocationResponse ="";
-        URL geolocationURL = new URL("http://ip-api.com/json");
-        URLConnection geolocationConnection = geolocationURL.openConnection();
-        BufferedReader in = new BufferedReader(new InputStreamReader(geolocationConnection.getInputStream()));
-        String inputLine;
+    public void populate() {
 
-        while ((inputLine = in.readLine()) != null)
-            geolocationResponse += inputLine;
-        in.close();
-        
-        this.geoLocation = geolocationResponse;
-        
-        getCoords();
-        
-        /******************************************Saving the last call time to the API**********************************************/
-        BufferedReader br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
-        
-        Long dt = 0l;
-        String s = br.readLine();
-        if(s != null) {
-            Date parsedDate = dateFormat.parse(s);
-            Timestamp lastCall = new Timestamp(parsedDate.getTime());
-            dt = new Timestamp(new Date().getTime()).getTime() - lastCall.getTime();
+        try {
+            String json = connection();
+            this.w = new Weather(json);
+            this.w.parse();
             
-            if(dt < 600000) { //If last call time less than 10 minutes, use the saved previous response, no call
-            BufferedReader br2 = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
-            return br2.readLine();
+            this.city.setText(this.w.getCity() + ", " + this.w.getCountry());
+            this.temp.setText(String.valueOf(this.w.ls.get(0).getTemp()) + "° c");
+            
+            SimpleDateFormat format = new SimpleDateFormat("yyyy.MM.dd HH:mm");
+            this.date.setText(format.format(this.w.ls.get(0).getDate()));
+            this.sky.setText(this.w.ls.get(0).getSky());
+            
+            String s = this.w.ls.get(0).getSky();
+            
+            BufferedImage bigImg = ImageIO.read(getClass().getResource("/com/namhto/images/map.png"));
+            
+            final int width = 96;
+            final int height = 90;
+            final int rows = 7;
+            final int cols = 5;
+            BufferedImage[] sprites = new BufferedImage[rows * cols];
+            
+            for (int i = 0; i < rows; i++) {
+                for (int j = 0; j < cols; j++) {
+                    sprites[(i * cols) + j] = bigImg.getSubimage(j * width, i * height, width, height);
+                }
             }
+            
+            this.refresh.setIcon(new ImageIcon(sprites[18]));
+            
+            Calendar cal = Calendar.getInstance();
+            int hour = cal.get(Calendar.HOUR_OF_DAY);
+            
+            switch (s) {
+                case "Rain":
+                    this.weather.setIcon(new ImageIcon(sprites[26]));
+                    break;
+                case "Clear":
+                    if (hour >= 6 && hour < 18) {
+                        this.weather.setIcon(new ImageIcon(sprites[5]));
+                    } else {
+                        this.weather.setIcon(new ImageIcon(sprites[10]));
+                    }
+                    break;
+                case "Clouds":
+                    if (hour >= 6 && hour < 18) {
+                        this.weather.setIcon(new ImageIcon(sprites[9]));
+                    } else {
+                        this.weather.setIcon(new ImageIcon(sprites[14]));
+                    }
+                    break;
+                case "Snow":
+                    this.weather.setIcon(new ImageIcon(sprites[32]));
+                    break;
+                default:
+                    break;
+            }
+        }
+        catch (ParseException ex) {}
+        catch (IOException ex) {}
+    }
 
-            else {
-                String weatherResponse ="";
+    public void getCoords() throws FileNotFoundException, IOException {
+
+        try {
+            JSONParser parser = new JSONParser();
+            JSONObject jsonobject = (JSONObject) parser.parse(this.geoLocation);
+            this.lat = (Double) jsonobject.get("lat");
+            this.lon = (Double) jsonobject.get("lon");
+        }
+        catch (ParseException ex) {
+            BufferedReader br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/coords.txt").getPath()));
+            this.geoLocation = br.readLine();
+            getCoords();
+        }
+    }
+
+    public String connection() {
+
+        try {
+            /*** ****************************************IP geolocation**********************************************/
+            String geolocationResponse = "";
+            URL geolocationURL = new URL("http://ip-api.com/json");
+            URLConnection geolocationConnection = geolocationURL.openConnection();
+            BufferedReader in = new BufferedReader(new InputStreamReader(geolocationConnection.getInputStream()));
+            String inputLine;
+            
+            while ((inputLine = in.readLine()) != null) {
+                geolocationResponse += inputLine;
+            }
+            in.close();
+            
+            this.geoLocation = geolocationResponse;
+            
+            File coords = new File(getClass().getResource("/com/namhto/weather/coords.txt").getPath());
+            if(!coords.exists())
+                coords.createNewFile();
+            
+            BufferedWriter outCoords = new BufferedWriter(new FileWriter(getClass().getResource("/com/namhto/weather/coords.txt").getPath()));
+            outCoords.write(geolocationResponse);
+            outCoords.close();
+            
+            getCoords();
+            
+            /******************************************Saving the last call time to the API**********************************************/
+            BufferedReader br = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
+            
+            Long dt = 0l;
+            String s = br.readLine();
+            if (s != null) {
+                Date parsedDate = dateFormat.parse(s);
+                Timestamp lastCall = new Timestamp(parsedDate.getTime());
+                dt = new Timestamp(new Date().getTime()).getTime() - lastCall.getTime();
+                
+                if (dt < 600000) { //If last call time less than 10 minutes, use the saved previous response, no call
+                    BufferedReader br2 = new BufferedReader(new FileReader(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
+                    return br2.readLine();
+                } else {
+                    String weatherResponse = "";
+                    String requestURL = "http://api.openweathermap.org/data/2.5/weather?lat=" + this.lat + "&lon=" + this.lon + "&APPID=06ffd4bac466fcc023a7d2a824aa2891";
+                    URL oracle = new URL(requestURL);
+                    URLConnection yc = oracle.openConnection();
+                    BufferedReader in2 = new BufferedReader(new InputStreamReader(yc.getInputStream()));
+                    String inputLine2;
+                    
+                    while ((inputLine2 = in2.readLine()) != null) {
+                        weatherResponse += inputLine2;
+                    }
+                    in2.close();
+                    
+                    /**
+                     * ****************************************Saving the counter
+                     * since the last call to the weather
+                     * API*********************************************
+                     */
+                    BufferedWriter out = new BufferedWriter(new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
+                    out.write(new Timestamp(new Date().getTime()).toString());
+                    out.close();
+                    
+                    /**
+                     * ****************************************Saving the last
+                     * response of the weather
+                     * API*********************************************
+                     */
+                    BufferedWriter out2 = new BufferedWriter(new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
+                    out2.write(weatherResponse);
+                    out2.close();
+                    
+                    return weatherResponse;
+                }
+            } else {
+                
+                String weatherResponse = "";
                 String requestURL = "http://api.openweathermap.org/data/2.5/weather?lat=" + this.lat + "&lon=" + this.lon + "&APPID=06ffd4bac466fcc023a7d2a824aa2891";
                 URL oracle = new URL(requestURL);
                 URLConnection yc = oracle.openConnection();
                 BufferedReader in2 = new BufferedReader(new InputStreamReader(yc.getInputStream()));
                 String inputLine2;
 
-                while ((inputLine2 = in2.readLine()) != null)
-                    weatherResponse +=inputLine2;
+                while ((inputLine2 = in2.readLine()) != null) {
+                    weatherResponse += inputLine2;
+                }
                 in2.close();
 
-                /******************************************Saving the counter since the last call to the weather API**********************************************/
-                BufferedWriter out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
+                /******************************************Saving the counter since the last call to the weather API*******************************************/
+                BufferedWriter out = new BufferedWriter(new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
                 out.write(new Timestamp(new Date().getTime()).toString());
                 out.close();
 
-                /******************************************Saving the last response of the weather API**********************************************/
-                BufferedWriter out2 = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
+                /*****************************************Saving the last response of the weather API********************************************/
+                BufferedWriter out2 = new BufferedWriter(new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
                 out2.write(weatherResponse);
                 out2.close();
 
                 return weatherResponse;
             }
-        }
-        else {
             
-            String weatherResponse ="";
-                String requestURL = "http://api.openweathermap.org/data/2.5/weather?lat=" + this.lat + "&lon=" + this.lon + "&APPID=06ffd4bac466fcc023a7d2a824aa2891";
-                URL oracle = new URL(requestURL);
-                URLConnection yc = oracle.openConnection();
-                BufferedReader in2 = new BufferedReader(new InputStreamReader(yc.getInputStream()));
-                String inputLine2;
-
-                while ((inputLine2 = in2.readLine()) != null)
-                    weatherResponse +=inputLine2;
-                in2.close();
-
-                /******************************************Saving the counter since the last call to the weather API**********************************************/
-                BufferedWriter out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/count.txt").getPath()));
-                out.write(new Timestamp(new Date().getTime()).toString());
-                out.close();
-
-                /******************************************Saving the last response of the weather API**********************************************/
-                BufferedWriter out2 = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/save.txt").getPath()));
-                out2.write(weatherResponse);
-                out2.close();
-
-                return weatherResponse;
+        } catch (MalformedURLException ex) {
+            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (java.text.ParseException ex) {
+            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
         }
-        /******************************************Weather API call**********************************************/
-        
+
+        return null;
     }
-    
+
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -323,7 +375,7 @@ public class UI extends javax.swing.JFrame {
         try {
             int lastX = this.getLocationOnScreen().x;
             int lastY = this.getLocationOnScreen().y;
-            out = new BufferedWriter( new FileWriter(getClass().getResource("/com/namhto/weather/lastPos.txt").getPath()));
+            out = new BufferedWriter(new FileWriter(getClass().getResource("/com/namhto/weather/lastPos.txt").getPath()));
             out.write(lastX + "\n" + lastY);
             out.close();
             System.exit(0);
@@ -347,36 +399,26 @@ public class UI extends javax.swing.JFrame {
     }//GEN-LAST:event_menuMousePressed
 
     private void refreshMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_refreshMouseReleased
-        
-        try {
-            if(this.refresh.isEnabled()){
-                
-                this.refresh.setEnabled(false);
-                
-                this.refreshFeedBack.setOpaque(true);
-                this.refreshFeedBack.setBackground(new Color(100, 100, 100, 200));
-                this.refreshFeedBack.setText("Refresh...");
-                this.update(this.getGraphics());
-                
-                long start = System.currentTimeMillis();
-                long end = start + 2000;
-                while (System.currentTimeMillis() < end)
-                {
-                }
 
-                populate();
-                this.refreshFeedBack.setOpaque(false);
-                this.refreshFeedBack.setText("");
-                
-                this.refresh.setEnabled(true);
-            }           
-           
-        } catch (IOException ex) {
-            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ParseException ex) {
-            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (java.text.ParseException ex) {
-            Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
+        if (this.refresh.isEnabled()) {
+            
+            this.refresh.setEnabled(false);
+            
+            this.refreshFeedBack.setOpaque(true);
+            this.refreshFeedBack.setBackground(new Color(100, 100, 100, 200));
+            this.refreshFeedBack.setText("Refresh...");
+            this.update(this.getGraphics());
+            
+            long start = System.currentTimeMillis();
+            long end = start + 2000;
+            while (System.currentTimeMillis() < end) {
+            }
+            
+            populate();
+            this.refreshFeedBack.setOpaque(false);
+            this.refreshFeedBack.setText("");
+            
+            this.refresh.setEnabled(true);
         }
     }//GEN-LAST:event_refreshMouseReleased
 
@@ -410,15 +452,7 @@ public class UI extends javax.swing.JFrame {
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                try {
-                    new UI().setVisible(true);
-                } catch (IOException ex) {
-                    Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (ParseException ex) {
-                    Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (java.text.ParseException ex) {
-                    Logger.getLogger(UI.class.getName()).log(Level.SEVERE, null, ex);
-                }
+                new UI().setVisible(true);
             }
         });
     }

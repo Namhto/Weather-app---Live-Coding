@@ -25,7 +25,7 @@ public class Weather {
         this.json = json;
     }
 
-    public void parse() throws FileNotFoundException, IOException, ParseException {
+    public void parse() throws ParseException {
 
         JSONParser parser = new JSONParser();
         JSONObject jsonobject = (JSONObject) parser.parse(this.json);
@@ -39,29 +39,29 @@ public class Weather {
 
         JSONArray weather = (JSONArray) jsonobject.get("weather");
         String sky = (String) ((JSONObject) weather.get(0)).get("main");
-        
+
         Long time = (Long) jsonobject.get("dt");
-        Timestamp ts = new Timestamp(time*1000);
-        
+        Timestamp ts = new Timestamp(time * 1000);
+
         Timestamp localTime = new Timestamp(new Date().getTime() + Calendar.ZONE_OFFSET);
-        
+
         ls.add(new InstantWeather(temp, sky, localTime));
     }
 
     public String getCity() {
-            return city;
+        return city;
     }
 
     public void setCity(String city) {
-            this.city = city;
+        this.city = city;
     }
 
     public String getCountry() {
-            return country;
+        return country;
     }
 
     public void setCountry(String country) {
-            this.country = country;
+        this.country = country;
     }
 
 }
